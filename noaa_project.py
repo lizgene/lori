@@ -13,6 +13,7 @@ us_state_abbrev = {
     'CO': 'Colorado',
     'CT': 'Connecticut',
     'DE': 'Delaware',
+    'DC': 'Washington DC', # Added Washington DC
     'FL': 'Florida',
     'GA': 'Georgia',
     'HI': 'Hawaii',
@@ -57,6 +58,7 @@ us_state_abbrev = {
     'WY': 'Wyoming',
     'IA/IL': 'Iowa, Illinois',}
 import requests
+import re # This is how we're going to do a pattern text search.
 from bs4 import BeautifulSoup
 URL = 'https://www.weather.gov/'
 page = requests.get(URL)
@@ -64,7 +66,9 @@ soup = BeautifulSoup(page.content, 'html.parser')
 results = soup.find_all('div', id = (['wwaleft','wwaright','wwacenter_l','wwacenter_r']))
 URLSlist = []
 for result in results:
-    for a in BeautifulSoup(str(result)).findAll('a', href=True):
+    # I added 'html.parser' here, to get rid of a warning in the console.
+    soup_results = BeautifulSoup(str(result), 'html.parser').findAll('a', href=True)
+    for a in soup_results:
         URLS = a
         URLSfixed = "https:" + str(a).replace(' ', '%20').replace('amp;', '').replace('<a%20href="', '').replace('</a>', '')
         URLSfixedgood= str(URLSfixed).split('"',1)
@@ -82,12 +86,35 @@ for item in URLSlist:
     #print(soup)
     states = []
     for pre in soup.find_all('pre'):
+        # You can use the library 're' to look for a regular expression
+        # This just means you can look for a substring within a string
+        #
+        # https://www.w3schools.com/python/python_regex.asp
+        #
+        # Here's a fun tool to practice writing regular expressions to match
+        # text. f"\s{state}\s" just creates a string with two whitespaces around
+        # it to match on. So Indiana would be " IN " and you wouldn't find matches
+        # for a word like "RINO"
+        # https://rubular.com/
 
-        lines = BeautifulSoup(str(pre)).prettify().split('\n')
-        liness= lines[3].split(' ')[-1]
-        states.append(liness)
-        singlestates = set(states)
-    #print(singlestates)
+        # Convert pre to a string before you can do this
+        pre_string = str(pre.text)
+
+        # First loop through the abbreviations
+        for state in us_state_abbrev.keys():
+            matched_state = re.search(f"\s{state}\s", pre_string)
+            if matched_state:
+                # print(f"MATCHED STATE {state} for item {item}")
+                states.append(matched_state.group(0).strip())
+                singlestates = set(states)
+
+        # Then loop through the state names, just in case.
+        for state in us_state_abbrev.values():
+            matched_state = re.search(f"\s{state}\s", pre_string)
+            if matched_state:
+                # print(f"MATCHED STATE {state} for item {item}")
+                states.append(matched_state.group(0).strip())
+                singlestates = set(states)
 
     for h3 in soup.find('h3'):
         alert = str(h3)
@@ -115,8 +142,15 @@ for item in URLSlist:
 
     #print(commas_added)
     for taco in tacos:
+        # Now we have ot make sure the list is unique, since we looked for
+        # both state names and abbreviations, and there could be duplicates.
+        unique_tacos = set(tacos)
+        unique_state_list = ", ".join(unique_tacos)
 
-        manytacos = "A " + alert + " is in effect for parts of " + ", ".join((tacos)) + "."
+        # You can use a python "f string" to make strings a little easier than
+        # using the plus sign +
+        # https://realpython.com/python-f-strings/
+        manytacos = f"A {alert} is in effect for parts of {unique_state_list}.\n Source: {item}\n\n"
 
 
     print(str(manytacos))
